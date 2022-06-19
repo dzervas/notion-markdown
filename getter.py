@@ -155,6 +155,7 @@ def getPage(pageID, propertySchema):
 		parentID = value["parent_id"]
 
 		if id == pageID and blockType == "page":
+			frontmatter["date"] = value["created_time"]
 			for k, v in properties.items():
 				pName = propertySchema[k]["name"]
 				if propertySchema[k]["type"] == "checkbox":
