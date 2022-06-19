@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+from os import path
+from urllib.parse import quote_plus
+from datetime import datetime
 import requests
 import json
 
@@ -110,6 +114,8 @@ def handleTitle(titleArray):
 			else:
 				print(f"Unsupported formatting '{f}' of text {text} with value {formatting}")
 
+		if code:
+			text = f"`{text}`"
 		if link:
 			text = f"[{text}]({link_target})"
 		if bold:
@@ -120,8 +126,6 @@ def handleTitle(titleArray):
 			text = f"<u>{text}</u>"
 		if strikethrough:
 			text = f"~~{text}~~"
-		if code:
-			text = f"`{text}`"
 		if highlight and highlight_color is not None:
 			text = f'<span color="{highlight_color}">{text}</span>'
 
@@ -130,7 +134,17 @@ def handleTitle(titleArray):
 
 	return result
 
-def getPage(pageID, propertySchema):
+def downloadFile(id, url, static_dir, static_path):
+	res = requests.get("https://www.notion.so/image/" + quote_plus(url) + f"?table=block&id={id}")
+	filename = path.basename(url)
+
+	with open(static_dir + "/" + filename, "wb") as fd:
+		fd.write(res.content)
+
+	return static_path + "/" + filename
+
+
+def getPage(pageID, propertySchema, static_dir, static_path):
 	res = requests.post("https://www.notion.so/api/v3/loadCachedPageChunk", json={
 		"page": { "id": pageID },
 		"limit": 100,
@@ -155,13 +169,14 @@ def getPage(pageID, propertySchema):
 		parentID = value["parent_id"]
 
 		if id == pageID and blockType == "page":
-			frontmatter["date"] = value["created_time"]
+			frontmatter["date"] = datetime.fromtimestamp(value["created_time"] / 1000).isoformat()
 			for k, v in properties.items():
 				pName = propertySchema[k]["name"]
 				if propertySchema[k]["type"] == "checkbox":
 					frontmatter[pName] = v[0][0] == "Yes"
 				elif propertySchema[k]["type"] == "file":
-					frontmatter[pName] = v[0][1][0][1]
+					url = v[0][1][0][1]
+					frontmatter[pName] = downloadFile(id, url, static_dir, static_path)
 				else:
 					frontmatter[pName] = v[0][0]
 			continue
@@ -183,7 +198,8 @@ def getPage(pageID, propertySchema):
 		elif blockType == "sub_sub_header":
 			content += "### " + handleTitle(properties["title"]) + "\n"
 		elif blockType == "image":
-			content += "![" + handleTitle(properties["title"]) + "](" + properties["source"][0][0] + ")\n"
+			url = properties["source"][0][0]
+			content += "![" + handleTitle(properties["title"]) + "](" + downloadFile(id, url, static_dir, static_path) + ")\n"
 			content += properties["caption"][0][0]
 		elif blockType == "bulleted_list":
 			content += " - " + handleTitle(properties["title"])
@@ -203,7 +219,7 @@ def getPage(pageID, propertySchema):
 				checked = False
 
 			if checked:
-				content += " - [] " + handleTitle(properties["title"])
+				content += " - [ ] " + handleTitle(properties["title"])
 			else:
 				content += " - [x] " + handleTitle(properties["title"])
 		elif blockType == "toggle":
@@ -231,12 +247,27 @@ def fixFrontmatter(frontmatter):
 
 
 if __name__ == "__main__":
-	from sys import argv
-	spaceID, collectionID, collectionViewID, propertySchema = getCollectionIDs(argv[1])
+	import argparse
+
+	def dir_path(target):
+		if path.isdir(target):
+			return target
+		else:
+			raise argparse.ArgumentTypeError(f"readable_dir:{target} is not a valid path")
+
+
+	parser = argparse.ArgumentParser(description="Download Notion.so database as markdown files")
+	parser.add_argument("notiondbid", type=str, help="ID of the Page that has the Notion DB")
+	parser.add_argument("--content-dir", "-c", type=dir_path, help="Output directory for markdown files", default=".")
+	parser.add_argument("--static-dir", "-d", type=dir_path, help="Output directory for referenced files that get downloaded", default=".")
+	parser.add_argument("--static-url", "-u", type=str, help="URL path that the static files are accessible", default="/static")
+	args = parser.parse_args()
+
+	spaceID, collectionID, collectionViewID, propertySchema = getCollectionIDs(args.notiondbid)
 	pageIDs = getPageIDs(spaceID, collectionID, collectionViewID)
 	for p in pageIDs:
-		with open(p + ".md", "w") as fd:
+		with open(args.content_dir + "/" + p + ".md", "w") as fd:
 			print(f"Downloading page {p}")
-			frontmatter, content = getPage(p, propertySchema)
+			frontmatter, content = getPage(p, propertySchema, args.static_dir, args.static_url)
 			fd.write(json.dumps(frontmatter) + "\n")
 			fd.write(content)
