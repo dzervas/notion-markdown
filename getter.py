@@ -68,6 +68,8 @@ def handleTitle(titleArray):
 		text = textBlock[0]
 		formatting = textBlock[1]
 
+		link = False
+		link_target = None
 		bold = False
 		italics = False
 		underline = False
@@ -78,7 +80,13 @@ def handleTitle(titleArray):
 		highlight_color = None
 
 		for f in formatting:
-			if f[0] == "b":
+			if f[0] == "a":
+				link = True
+				try:
+					link_target = f[1]
+				except KeyError:
+					print("Could not find link target")
+			elif f[0] == "b":
 				bold = True
 			elif f[0] == "i":
 				italics = True
@@ -101,6 +109,8 @@ def handleTitle(titleArray):
 			else:
 				print(f"Unsupported formatting '{f}' of text {text} with value {formatting}")
 
+		if link:
+			text = f"[{text}]({link_target})"
 		if bold:
 			text = f"**{text}**"
 		if italics:
@@ -148,6 +158,8 @@ def getPage(pageID, propertySchema):
 				pName = propertySchema[k]["name"]
 				if propertySchema[k]["type"] == "checkbox":
 					frontmatter[pName] = v[0][0] == "Yes"
+				elif propertySchema[k]["type"] == "file":
+					frontmatter[pName] = v[0][1][0][1]
 				else:
 					frontmatter[pName] = v[0][0]
 			continue
