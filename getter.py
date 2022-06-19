@@ -1,4 +1,5 @@
 import requests
+import json
 
 HEADERS = {
 	"Content-Type": "application/json"
@@ -236,5 +237,5 @@ if __name__ == "__main__":
 		with open(p + ".md", "w") as fd:
 			print(f"Downloading page {p}")
 			frontmatter, content = getPage(p, propertySchema)
-			fd.write(str(frontmatter) + "\n")
+			fd.write(json.dumps(frontmatter) + "\n")
 			fd.write(content)
