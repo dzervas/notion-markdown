@@ -10,7 +10,7 @@ HEADERS = {
 }
 
 def getCollectionIDs(notionDBID):
-	res = requests.post("https://www.notion.so/api/v3/loadCachedPageChunk", json={
+	res = requests.post("https://www.notion.so/api/v3/loadPageChunk", json={
 		"page": { "id": notionDBID },
 		"limit": 100,
 		"cursor": { "stack": [] },
@@ -28,7 +28,7 @@ def getCollectionIDs(notionDBID):
 
 	return (spaceID, collectionID, collectionViewID, propertySchema)
 
-def getPageIDs(spaceID, collectionID, collectionViewID):
+def queryCollection(spaceID, collectionID, collectionViewID):
 	res = requests.post("https://www.notion.so/api/v3/queryCollection", json={
 		"collection": {
 			"id": collectionID,
@@ -43,16 +43,6 @@ def getPageIDs(spaceID, collectionID, collectionViewID):
 					"type":"results",
 					"limit":100
 				}
-			# TODO: Filter by published
-			# },"filter":{
-			# 	"operator":"and",
-			# 	"filters":[{
-			# 		"property":"TerZ",
-			# 		"filter":{
-			# 			"operator":"checkbox_is",
-			# 			"value": {"type":"exact","value":true}
-			# 		}
-			# 	}]
 			},
 			"searchQuery":"",
 			"userTimeZone":"Europe/Athens"
@@ -60,7 +50,11 @@ def getPageIDs(spaceID, collectionID, collectionViewID):
 
 	})
 
-	return res.json()["result"]["reducerResults"]["collection_group_results"]["blockIds"]
+	return res.json()
+
+def getPageIDs(spaceID, collectionID, collectionViewID):
+	res = queryCollection(spaceID, collectionID, collectionViewID)
+	return res["result"]["reducerResults"]["collection_group_results"]["blockIds"]
 
 def handleTitle(titleArray):
 	result = ""
@@ -159,12 +153,34 @@ def getPage(pageID, propertySchema, static_dir, static_path):
 	numbered_list = 0
 
 	for block in data["block"].values():
+		value = block["value"]
+		id = value["id"]
+		blockType = value["type"]
+		parentID = value["parent_id"]
+
+		if parentID == pageID and blockType == "collection_view":
+			spaceID = value["space_id"]
+			collectionID = value["collection_id"]
+			collectionViewID = value["id"]
+
+			collection = queryCollection(spaceID, collectionID, collectionViewID)
+			collectionPropertySchema = collection["recordMap"]["collection"][collectionID]["value"]["schema"]
+
+			content += "| " + " | ".join(x["name"] for x in collectionPropertySchema.values()) + " |\n"
+			content += "| " + (" --- |" * len(collectionPropertySchema)) + "\n"
+
+			# TODO: Sort the values correctly
+			for collectionBlock in collection["recordMap"]["block"].values():
+				if collectionBlock["value"]["parent_id"] != collectionID or collectionBlock["value"]["type"] != "page":
+					continue
+
+				content += "| " + " | ".join(x[0][0] for x in collectionBlock["value"]["properties"].values()) + " |\n"
+
+			content += "\n"
+			continue
+
 		try:
-			value = block["value"]
-			id = value["id"]
-			blockType = value["type"]
 			properties = value["properties"]
-			parentID = value["parent_id"]
 		except KeyError:
 			continue
 
