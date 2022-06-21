@@ -145,7 +145,7 @@ def downloadFile(id, url, static_dir, static_path):
 
 
 def getPage(pageID, propertySchema, static_dir, static_path):
-	res = requests.post("https://www.notion.so/api/v3/loadCachedPageChunk", json={
+	res = requests.post("https://www.notion.so/api/v3/loadPageChunk", json={
 		"page": { "id": pageID },
 		"limit": 100,
 		"cursor": { "stack": [] },
@@ -159,14 +159,14 @@ def getPage(pageID, propertySchema, static_dir, static_path):
 	numbered_list = 0
 
 	for block in data["block"].values():
-		value = block["value"]
-		id = value["id"]
-		blockType = value["type"]
 		try:
+			value = block["value"]
+			id = value["id"]
+			blockType = value["type"]
 			properties = value["properties"]
+			parentID = value["parent_id"]
 		except KeyError:
 			continue
-		parentID = value["parent_id"]
 
 		if id == pageID and blockType == "page":
 			frontmatter["date"] = datetime.fromtimestamp(value["created_time"] / 1000).isoformat()
@@ -205,8 +205,11 @@ def getPage(pageID, propertySchema, static_dir, static_path):
 			content += "### " + handleTitle(properties["title"]) + "\n"
 		elif blockType == "image":
 			url = properties["source"][0][0]
-			content += "![" + handleTitle(properties["title"]) + "](" + downloadFile(id, url, static_dir, static_path) + ")\n"
-			content += properties["caption"][0][0]
+			title = handleTitle(properties["title"])
+			if "caption" in properties:
+				title = properties["caption"][0][0]
+
+			content += "![" + title + "](" + downloadFile(id, url, static_dir, static_path) + ")\n"
 		elif blockType == "bulleted_list":
 			content += " - " + handleTitle(properties["title"])
 		elif blockType == "numbered_list":
