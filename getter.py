@@ -136,7 +136,7 @@ def handleTitle(titleArray):
 
 def downloadFile(id, url, static_dir, static_path):
 	res = requests.get("https://www.notion.so/image/" + quote_plus(url) + f"?table=block&id={id}")
-	filename = path.basename(url)
+	filename = "notion-" + path.basename(url)
 
 	with open(static_dir + "/" + filename, "wb") as fd:
 		fd.write(res.content)
@@ -172,7 +172,13 @@ def getPage(pageID, propertySchema, static_dir, static_path):
 			frontmatter["date"] = datetime.fromtimestamp(value["created_time"] / 1000).isoformat()
 			for k, v in properties.items():
 				pName = propertySchema[k]["name"]
-				if propertySchema[k]["type"] == "checkbox":
+				if v[0][0] == "‣":
+					value_array = v[0][1]
+					# TODO: Handle more data types
+					if value_array[0][0] == "d":
+						# TODO: Handle dates better
+						frontmatter[pName] = datetime.strptime(value_array[0][1]["start_date"], "%Y-%m-%d").isoformat()
+				elif propertySchema[k]["type"] == "checkbox":
 					frontmatter[pName] = v[0][0] == "Yes"
 				elif propertySchema[k]["type"] == "file":
 					url = v[0][1][0][1]
@@ -266,7 +272,7 @@ if __name__ == "__main__":
 	spaceID, collectionID, collectionViewID, propertySchema = getCollectionIDs(args.notiondbid)
 	pageIDs = getPageIDs(spaceID, collectionID, collectionViewID)
 	for p in pageIDs:
-		with open(args.content_dir + "/" + p + ".md", "w") as fd:
+		with open(args.content_dir + "/notion-" + p + ".md", "w") as fd:
 			print(f"Downloading page {p}")
 			frontmatter, content = getPage(p, propertySchema, args.static_dir, args.static_url)
 			fd.write(json.dumps(frontmatter) + "\n")
