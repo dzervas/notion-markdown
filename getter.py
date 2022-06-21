@@ -130,7 +130,7 @@ def handleTitle(titleArray):
 
 def downloadFile(id, url, static_dir, static_path):
 	res = requests.get("https://www.notion.so/image/" + quote_plus(url) + f"?table=block&id={id}")
-	filename = "notion-" + path.basename(url)
+	filename = "notion-" + id + "-" + path.basename(url)
 
 	with open(static_dir + "/" + filename, "wb") as fd:
 		fd.write(res.content)
