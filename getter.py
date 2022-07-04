@@ -273,6 +273,8 @@ def fixFrontmatter(frontmatter):
 
 if __name__ == "__main__":
 	import argparse
+	import toml
+	from pathlib import Path
 
 	def dir_path(target):
 		if path.isdir(target):
@@ -283,16 +285,39 @@ if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser(description="Download Notion.so database as markdown files")
 	parser.add_argument("notiondbid", type=str, help="ID of the Page that has the Notion DB")
-	parser.add_argument("--content-dir", "-c", type=dir_path, help="Output directory for markdown files", default=".")
+	parser.add_argument("--config", "-c", type=Path, help="Config mode where the db is handled as a configuration page for the SSG")
+	parser.add_argument("--output-dir", "-o", type=dir_path, help="Output directory for markdown files", default=".")
 	parser.add_argument("--static-dir", "-d", type=dir_path, help="Output directory for referenced files that get downloaded", default=".")
 	parser.add_argument("--static-url", "-u", type=str, help="URL path that the static files are accessible", default="/static")
 	args = parser.parse_args()
 
 	spaceID, collectionID, collectionViewID, propertySchema = getCollectionIDs(args.notiondbid)
 	pageIDs = getPageIDs(spaceID, collectionID, collectionViewID)
-	for p in pageIDs:
-		with open(args.content_dir + "/notion-" + p + ".md", "w") as fd:
-			print(f"Downloading page {p}")
-			frontmatter, content = getPage(p, propertySchema, args.static_dir, args.static_url)
-			fd.write(json.dumps(frontmatter) + "\n")
-			fd.write(content)
+
+	if not args.config:
+		for p in pageIDs:
+			with open(args.output_dir + "/notion-" + p + ".md", "w") as fd:
+				print(f"Downloading page {p}")
+				frontmatter, content = getPage(p, propertySchema, args.static_dir, args.static_url)
+				fd.write(json.dumps(frontmatter) + "\n")
+				fd.write(content)
+	else:
+		result = {}
+
+		for p in pageIDs:
+			frontmatter, _content = getPage(p, propertySchema, args.static_dir, args.static_url)
+
+			value = eval(f'{frontmatter["type"].lower()}("{frontmatter[frontmatter["type"].lower()]}")')
+			if type(value) == str:
+				value = '"' + value + '"'
+			else:
+				value = str(value).lower()
+
+			sub = frontmatter["name"] + " = " + value
+			sub_parsed = toml.loads(sub)
+			print(sub_parsed)
+			result.update(sub_parsed)
+
+
+		with open(args.config, "w") as fd:
+			fd.write(toml.dumps(result))
