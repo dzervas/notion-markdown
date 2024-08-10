@@ -10,6 +10,9 @@ HEADERS = {
 }
 
 def getCollectionIDs(notionDBID):
+	if "-" not in notionDBID:
+		notionDBID = notionDBID[:8] + "-" + notionDBID[8:12] + "-" + notionDBID[12:16] + "-" + notionDBID[16:20] + "-" + notionDBID[20:]
+
 	res = requests.post("https://www.notion.so/api/v3/loadPageChunk", json={
 		"page": { "id": notionDBID },
 		"limit": 100,
@@ -89,7 +92,7 @@ def handleTitle(titleArray):
 				bold = True
 			elif f[0] == "i":
 				italics = True
-			elif f[0] == "u":
+			elif f[0] == "u" or f[0] == "_":
 				underline = True
 			elif f[0] == "s":
 				strikethrough = True
@@ -182,6 +185,8 @@ def getPage(pageID, propertySchema, static_dir, static_path):
 		try:
 			properties = value["properties"]
 		except KeyError:
+			if blockType == "divider":
+				content += "---\n"
 			continue
 
 		if id == pageID and blockType == "page":
