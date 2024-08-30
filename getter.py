@@ -291,6 +291,7 @@ if __name__ == "__main__":
 	parser.add_argument("--content-dir", "-c", type=dir_path, help="Output directory for markdown files", default=".")
 	parser.add_argument("--static-dir", "-d", type=dir_path, help="Output directory for referenced files that get downloaded", default=".")
 	parser.add_argument("--static-url", "-u", type=str, help="URL path that the static files are accessible", default="/static")
+	parser.add_argument("--add-frontmatter", "-a", action="append", type=str, help="Additional frontmatter to add to all pages (e.g. -a layout=page)", default=[])
 	args = parser.parse_args()
 
 	spaceID, collectionID, collectionViewID, propertySchema = getCollectionIDs(args.notiondbid)
@@ -299,5 +300,11 @@ if __name__ == "__main__":
 		with open(args.content_dir + "/notion-" + p + ".md", "w") as fd:
 			print(f"Downloading page {p}")
 			frontmatter, content = getPage(p, propertySchema, args.static_dir, args.static_url)
+
+			for f in args.add_frontmatter:
+				k, v = f.split("=", 1)
+				frontmatter[k] = v
+			print(frontmatter)
+
 			fd.write(json.dumps(frontmatter) + "\n")
 			fd.write(content)
